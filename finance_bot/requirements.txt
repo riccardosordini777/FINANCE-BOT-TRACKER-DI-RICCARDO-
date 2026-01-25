@@ -1,0 +1,9 @@
+flask
+python-dotenv
+requests
+google-genai
+pandas
+openpyxl
+pydub
+twilio
+gunicorn
