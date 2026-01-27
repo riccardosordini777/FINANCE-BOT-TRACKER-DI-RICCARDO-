@@ -4,6 +4,7 @@ import json
 import uuid
 import database
 from utils import send_whatsapp_message, download_media
+from sheets import save_to_sheet
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
@@ -114,8 +115,20 @@ def parse_and_save_transaction(user_id, json_text):
         cat = data.get("category", "Altro")
         desc = data.get("description", "")
         
+        
         database.add_transaction(user_id, amount, cat, desc, json_text)
-        send_whatsapp_message(user_id, f"✅ *Salvato (Twilio)*\n💰 {amount}€\n📂 {cat}\n📝 {desc}")
+
+        # Save to Google Sheets
+        tx_type = data.get("type", "expense")
+        saved_sheet, msg_sheet = save_to_sheet(amount, cat, desc, tx_type)
+
+        response_msg = f"✅ *Salvato*\n💰 {amount}€\n📂 {cat}\n📝 {desc}"
+        if saved_sheet:
+            response_msg += "\n📊 *Sheet: OK*"
+        else:
+            response_msg += f"\n⚠️ *Sheet: {msg_sheet}*"
+
+        send_whatsapp_message(user_id, response_msg)
         
     except Exception as e:
         send_whatsapp_message(user_id, "❌ Errore dati.")

@@ -4,3 +4,4 @@ __pycache__/
 finance.db
 *.ogg
 *.wav
+google_credentials.json
