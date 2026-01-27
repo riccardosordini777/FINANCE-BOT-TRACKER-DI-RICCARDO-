@@ -25,6 +25,10 @@ def send_whatsapp_message(to_number, text_body):
     from_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
     
     try:
+        # Truncate message to avoid Twilio 1600 limit (HTTP 400)
+        if len(text_body) > 1500:
+            text_body = text_body[:1500] + "... (troncato)"
+
         message = client.messages.create(
             from_=from_number,
             body=text_body,
