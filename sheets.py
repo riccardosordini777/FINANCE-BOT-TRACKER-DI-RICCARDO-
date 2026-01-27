@@ -31,6 +31,7 @@ def get_client():
 def save_to_sheet(amount, category, description, type_="expense"):
     """
     Appends a new transaction row to the configured Google Sheet.
+    Organizes data by Month (Tab Name: "Mese YYYY", e.g., "Gennaio 2026")
     Row format: [Date, Amount, Category, Description, Type]
     """
     try:
@@ -46,18 +47,31 @@ def save_to_sheet(amount, category, description, type_="expense"):
 
         # Open the spreadsheet
         sh = gc.open_by_key(sheet_id)
-        worksheet = sh.get_worksheet(0) # Open first tab
-
-        # Check if header exists, if not create it (Optional, but good for UX)
-        # Reading cell A1 requires an API call, we'll skip for speed or do it blindly.
-        # Just appending.
         
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Calculate Tab Name (Italian)
+        now = datetime.now()
+        months_it = {
+            1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile",
+            5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
+            9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
+        }
+        tab_name = f"{months_it[now.month]} {now.year}"
+        
+        # Try to Select or Create Worksheet
+        try:
+            worksheet = sh.worksheet(tab_name)
+        except gspread.WorksheetNotFound:
+            # Create new worksheet
+            worksheet = sh.add_worksheet(title=tab_name, rows=100, cols=10)
+            # Add Header
+            worksheet.append_row(["Data", "Importo (€)", "Categoria", "Descrizione", "Tipo"])
+            # Optional: Style header (bold) - requires more API calls, keeping it simple.
 
         # Append row: [Date, Amount, Category, Description, Type]
-        worksheet.append_row([now, amount, category, description, type_])
+        date_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        worksheet.append_row([date_str, amount, category, description, type_])
         
-        return True, "Salvato su Sheets"
+        return True, f"Salvato su '{tab_name}'"
 
     except Exception as e:
         print(f"❌ Errore GSheets: {e}")
