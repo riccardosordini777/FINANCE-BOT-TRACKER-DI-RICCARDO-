@@ -65,13 +65,17 @@ def handle_audio_message(user_id, media_url):
         myfile = genai.upload_file(filename)
         
         prompt = """
-        Ascolta questo audio. Estrai (o deduci) transazione:
-        {
-            "amount": numero (es. 10.50),
-            "category": stringa,
-            "description": stringa,
-            "type": "expense" o "income"
-        }
+        Ascolta questo audio e identifica TUTTE le spese menzionate.
+        Restituisci una LISTA JSON:
+        [
+            {
+                "amount": numero,
+                "category": stringa,
+                "description": stringa,
+                "type": "expense" o "income"
+            },
+            ...
+        ]
         """
         result = model.generate_content([myfile, prompt])
         
@@ -88,13 +92,16 @@ def process_transaction_with_llm(user_id, text):
     model = get_gemini_model()
     prompt = f"""
     Analizza testo: "{text}"
-    Estrai JSON:
-    {{
+    Estrai JSON LIST (array di oggetti):
+    [
+        {{
             "amount": numero,
             "category": stringa,
             "description": stringa,
             "type": "expense"
-    }}
+        }},
+        ...
+    ]
     """
     try:
         result = model.generate_content(prompt)
@@ -107,28 +114,38 @@ def parse_and_save_transaction(user_id, json_text):
         clean_text = json_text.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean_text)
         
-        if "error" in data:
-            send_whatsapp_message(user_id, "❌ Non ho capito.")
-            return
+        # Normalize to list
+        if isinstance(data, dict):
+            data = [data]
+            
+        if not isinstance(data, list):
+             send_whatsapp_message(user_id, "❌ Errore formato AI.")
+             return
 
-        amount = float(data.get("amount", 0))
-        cat = data.get("category", "Altro")
-        desc = data.get("description", "")
+        final_msg = ""
         
-        
-        database.add_transaction(user_id, amount, cat, desc, json_text)
+        for item in data:
+            if "error" in item:
+                continue
 
-        # Save to Google Sheets
-        tx_type = data.get("type", "expense")
-        saved_sheet, msg_sheet = save_to_sheet(amount, cat, desc, tx_type)
+            amount = float(item.get("amount", 0))
+            cat = item.get("category", "Altro")
+            desc = item.get("description", "")
+            tx_type = item.get("type", "expense")
+            
+            database.add_transaction(user_id, amount, cat, desc, json.dumps(item))
 
-        response_msg = f"✅ *Salvato*\n💰 {amount}€\n📂 {cat}\n📝 {desc}"
-        if saved_sheet:
-            response_msg += "\n📊 *Sheet: OK*"
+            # Save to Google Sheets
+            saved_sheet, _ = save_to_sheet(amount, cat, desc, tx_type)
+            
+            icon = "✅" if saved_sheet else "⚠️"
+            final_msg += f"{icon} {amount}€ ({cat}) - {desc}\n"
+
+        if not final_msg:
+            send_whatsapp_message(user_id, "❌ Nessuna transazione trovata.")
         else:
-            response_msg += f"\n⚠️ *Sheet: {msg_sheet}*"
-
-        send_whatsapp_message(user_id, response_msg)
+            send_whatsapp_message(user_id, final_msg)
         
     except Exception as e:
-        send_whatsapp_message(user_id, "❌ Errore dati.")
+        logger.error(f"Parse Error: {e}")
+        send_whatsapp_message(user_id, "❌ Errore elaborazione.")
