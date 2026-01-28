@@ -15,7 +15,7 @@ def get_gemini_model():
         logger.error("Gemini API Key missing (tried GOOGLE_API_KEY and GEMINI_API_KEY)")
         return None
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-1.5-flash')
+    return genai.GenerativeModel('gemini-1.5-pro')
 
 def process_twilio_message(form_data):
     """
