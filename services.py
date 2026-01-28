@@ -10,11 +10,12 @@ import google.generativeai as genai
 logger = logging.getLogger(__name__)
 
 def get_gemini_model():
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
+        logger.error("Gemini API Key missing (tried GOOGLE_API_KEY and GEMINI_API_KEY)")
         return None
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-2.0-flash')
+    return genai.GenerativeModel('gemini-1.5-flash')
 
 def process_twilio_message(form_data):
     """
